@@ -5,6 +5,6 @@ struct FDPair {
   int newfd;
 };
 
-void run_single(struct Command* command);
+void run_single(struct ParsedInput* input);
 void run(struct ParsedInput* input);
 

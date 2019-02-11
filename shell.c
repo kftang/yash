@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "signals.h"
 #include "parser.h"
 #include "runner.h"
@@ -11,7 +12,9 @@ int main() {
   char* input = (char*) malloc(sizeof(char) * 2001);
   jobs = (struct JobsList*) malloc(sizeof(struct JobsList));
   init_jobs(20);
+  gpidRunning = 0;
   setup_handlers();
+  setsid();
   do {
     printf("# ");
     fgets(input, 2000, stdin);
@@ -23,7 +26,6 @@ int main() {
 
     // If the error flag is set, don't parse input and skip line
     if (ferror(stdin)) {
-      printf("\n");
       clearerr(stdin);
       continue;
     }
@@ -31,38 +33,26 @@ int main() {
     // Get rid of newline from fgets
     input[strcspn(input, "\n")] = 0;
 
-    // Parse input
-    struct ParsedInput* parsedInput = parse_input(input);
-    if (parsedInput != NULL) {
-      /*
-      for (int i = 0; i < parsedInput->numCommands; i++) {
-        printf("Command %d\nArguments: ", i);
-        struct Command* currentCommand = parsedInput->commands[i];
-        for (int j = 0; j < currentCommand->numArgs; j++) {
-          printf("%s, ", currentCommand->args[j]->tokenValue);
+    // Check input for job control commands
+    if (strcmp(input, "jobs") == 0) {
+      print_jobs();
+    } else if (strcmp(input, "fg") == 0) {
+
+    } else if (strcmp(input, "bg") == 0) {
+
+    } else {
+
+      // Parse input
+      struct ParsedInput* parsedInput = parse_input(input);
+      if (parsedInput != NULL) {
+        if (parsedInput->numCommands > 1) {
+          run(parsedInput);
+        } else {
+          run_single(parsedInput);
         }
-        if (currentCommand->err != NULL) {
-          printf("\nError File: %s", currentCommand->err->tokenValue);
-        }
-        if (currentCommand->out != NULL) {
-          printf("\nOut File: %s", currentCommand->out->tokenValue);
-        }
-        if (currentCommand->in != NULL) {
-          printf("\nInput File: %s", currentCommand->in->tokenValue);
-        }
-        if (currentCommand->backgrounded) {
-          printf("\nBackgrounded");
-        }
-        printf("\n");
+        // Free the parsed input
+        free_tokens(parsedInput);
       }
-      */
-      if (parsedInput->numCommands > 1) {
-        run(parsedInput);
-      } else {
-        run_single(parsedInput->commands[0]);
-      }
-      // Free the parsed input
-      free_tokens(parsedInput);
     }
   } while (1); 
 
