@@ -2,8 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <errno.h>
 #include "parser.h"
 #include "jobs.h"
 #include "signals.h"
@@ -26,7 +28,7 @@ void _close_pipes(int* pipes, int numPipes) {
 }
 
 // Runs command with pipe returning the cpid and outfd
-int _run_with_pipe(struct Command* command, int infd, int* pipeRead, bool sid) {
+int _run_with_pipe(struct Command* command, int infd, int* pipeRead, int pgid, bool sid) {
   char** commandAsString = _get_command_as_args_array(command);
   int pfd[2];
   pipe(pfd);
@@ -34,7 +36,9 @@ int _run_with_pipe(struct Command* command, int infd, int* pipeRead, bool sid) {
   if (cpid == 0) {
     if (sid) {
       setsid();
-    }
+    } 
+    setpgid(0, pgid);
+    
     dup2(infd, STDIN_FILENO);
     dup2(pfd[1], STDOUT_FILENO);
     close(pfd[0]);
@@ -55,13 +59,14 @@ void run(struct ParsedInput* input) {
   int lastPipeRead;
 
   // Run first command
-  int cpidFirst = _run_with_pipe(input->commands[0], STDIN_FILENO, &lastPipeRead, true);
+  int cpidFirst = _run_with_pipe(input->commands[0], STDIN_FILENO, &lastPipeRead, 0, true);
+  setpgid(cpidFirst, cpidFirst);
   gpidRunning = cpidFirst;
   add_job(cpidFirst, input->originalInput);
 
   // Run commands in middle
   for (int i = 1; i < input->numCommands - 1; i++) {
-    int pid = _run_with_pipe(input->commands[i], lastPipeRead, &lastPipeRead, false);
+    int pid = _run_with_pipe(input->commands[i], lastPipeRead, &lastPipeRead, cpidFirst, false);
     setpgid(pid, cpidFirst);
   }
 
@@ -70,6 +75,7 @@ void run(struct ParsedInput* input) {
   char** lastCommandAsString = _get_command_as_args_array(lastCommand);
   int cpidLast = fork();
   if (cpidLast == 0) {
+    setpgid(0, cpidFirst);
     dup2(lastPipeRead, STDIN_FILENO);
     execvp(lastCommandAsString[0], lastCommandAsString);
     exit(1);
@@ -95,12 +101,18 @@ void run_single(struct ParsedInput* input) {
   char** commandAsString = _get_command_as_args_array(command);
   int cpid = fork();
   if (cpid == 0) {
+    setsid();
     setpgid(0, 0);
-    reset_handlers();
+    if (!command->backgrounded) {
+      tcsetpgrp(STDIN_FILENO, getpgrp()); 
+    }
     execvp(commandAsString[0], commandAsString);
     exit(1);
   }
-  setpgid(cpid, cpid);
+  setpgid(cpid, 0);
+  if (!command->backgrounded) {
+    tcsetpgrp(STDIN_FILENO, cpid); 
+  }
 
   char* originalInput = input->originalInput;
   char* inputCopy = (char*) malloc(sizeof(char) * (strlen(originalInput) + 1));
@@ -110,17 +122,11 @@ void run_single(struct ParsedInput* input) {
     tcsetpgrp(STDIN_FILENO, cpid); 
     int status;
     waitpid(cpid, &status, WUNTRACED);
-    tcsetpgrp(STDIN_FILENO, getpid());
+    tcsetpgrp(STDIN_FILENO, getpgrp());
     if (WIFSTOPPED(status)) {
       int jobId = add_job(cpid, inputCopy);
       set_job_status(jobId, JOB_STOPPED);
       printf("\n");
-    }
-    if (WIFEXITED(status)) {
-      printf("exit: %d", WEXITSTATUS(status));
-    }
-    if (WIFSIGNALED(status)) {
-      printf("signal: %d", WTERMSIG(status));
     }
   } else {
     add_job(cpid, inputCopy);

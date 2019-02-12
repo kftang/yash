@@ -49,20 +49,20 @@ void handle_signal(int signal) {
 void setup_handlers() {
   struct sigaction action;
   action.sa_handler = &handle_signal;
-  action.sa_flags = 0;
+  action.sa_flags = SA_RESTART;
   
   sigemptyset(&(action.sa_mask));
   sigaddset(&(action.sa_mask), SIGINT);
   sigaddset(&(action.sa_mask), SIGCHLD);
   sigaddset(&(action.sa_mask), SIGTSTP);
-  sigaddset(&(action.sa_mask), SIGTTOU);
-  sigaddset(&(action.sa_mask), SIGTTIN);
+  // sigaddset(&(action.sa_mask), SIGTTOU);
+  // sigaddset(&(action.sa_mask), SIGTTIN);
 
   sigaction(SIGINT, &action, NULL);
   sigaction(SIGCHLD, &action, NULL);
   sigaction(SIGTSTP, &action, NULL);
   sigaction(SIGTTOU, &action, NULL);
-  sigaction(SIGTTIN, &action, NULL);
+  //sigaction(SIGTTIN, &action, NULL);
 }
 
 void reset_handlers() {

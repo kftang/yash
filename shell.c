@@ -14,7 +14,7 @@ int main() {
   init_jobs(20);
   gpidRunning = 0;
   setup_handlers();
-  setsid();
+  //setsid();
   do {
     printf("# ");
     fgets(input, 2000, stdin);
@@ -27,7 +27,7 @@ int main() {
     // If the error flag is set, don't parse input and skip line
     if (ferror(stdin)) {
       clearerr(stdin);
-      continue;
+      break;
     }
 
     // Get rid of newline from fgets
@@ -37,7 +37,7 @@ int main() {
     if (strcmp(input, "jobs") == 0) {
       print_jobs();
     } else if (strcmp(input, "fg") == 0) {
-
+      fg_job();
     } else if (strcmp(input, "bg") == 0) {
 
     } else {

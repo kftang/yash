@@ -1,6 +1,8 @@
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "jobs.h"
@@ -21,12 +23,38 @@ char* _status(struct Job* job) {
   return statusString;
 }
 
+void fg_job() {
+  if (jobs->numJobs < 1) {
+    return;
+  }
+  struct Job* lastJob = jobs->jobs[jobs->numJobs - 1];
+  printf("%s\n", lastJob->command);
+  kill(lastJob->pgid, SIGCONT);
+  int status;
+  waitpid(-lastJob->pgid, &status, WUNTRACED);
+  tcsetpgrp(STDIN_FILENO, getpgrp());
+  if (WIFSTOPPED(status)) {
+    printf("\n");
+  }
+  if (WIFEXITED(status)) {
+    remove_job(jobs->numJobs - 1);
+  }
+}
+
+void bg_job() {
+  if (jobs->numJobs < 1) {
+    return;
+  }
+  struct Job* lastJob = jobs->jobs[jobs->numJobs - 1];
+  printf("%s\n", lastJob->command);
+  kill(lastJob->pgid, SIGCONT);
+}
+
 void init_jobs(int maxJobs) {
   jobs->jobs = (struct Job**) malloc(sizeof(struct Job*) * maxJobs);
   for (int i = 0; i < maxJobs; i++) {
     jobs->jobs[i] = NULL;
   }
-  jobs->lastJob = 0;
   jobs->maxJobs = maxJobs;
   jobs->numJobs = 0;
 }
@@ -71,6 +99,10 @@ void print_jobs() {
     struct Job* job = jobs->jobs[i];
     char* statusString = _status(job);
     printf("[%d]%c\t%s\t\t%s\n", i + 1, i == jobs->numJobs - 1 ? '+' : '-', statusString, job->command);
+    if (job->status == JOB_DONE) {
+      remove_job(i);
+      i--;
+    }
     free(statusString);
   }
 }
@@ -83,6 +115,7 @@ void set_job_status(int jobNumber, int status) {
 void free_jobs() {
   for (int i = 0; i < jobs->numJobs; i++) {
     if (jobs->jobs[i] != NULL) {
+      free(jobs->jobs[i]->command);
       free(jobs->jobs[i]);
     }
   }

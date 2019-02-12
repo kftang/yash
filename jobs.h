@@ -14,7 +14,6 @@ struct Job {
 
 struct JobsList {
   struct Job** jobs;
-  int lastJob;
   int maxJobs;
   int numJobs;
 };
@@ -22,6 +21,7 @@ struct JobsList {
 struct JobsList* jobs;
 int gpidRunning;
 
+void fg_job();
 void init_jobs(int maxJobs);
 int add_job(int pgid, char* jobString);
 void remove_job(int pid);
