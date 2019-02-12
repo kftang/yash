@@ -24,9 +24,9 @@ struct Command {
   int numArgs;
   struct Token** tokens;
   struct Token** args;
-  struct Token* out;
-  struct Token* err;
-  struct Token* in;
+  int outfd;
+  int errfd;
+  int infd;
   bool backgrounded;
 };
 

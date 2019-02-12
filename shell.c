@@ -32,7 +32,7 @@ int main() {
     // If the error flag is set, don't parse input and skip line
     if (ferror(stdin)) {
       clearerr(stdin);
-      break;
+      continue;
     }
 
     // Get rid of newline from fgets

@@ -29,7 +29,8 @@ void fg_job() {
   }
   struct Job* lastJob = jobs->jobs[jobs->lastJob];
   printf("%s\n", lastJob->command);
-  kill(lastJob->pgid, SIGCONT);
+  kill(-lastJob->pgid, SIGCONT);
+  gpidRunning = lastJob->pgid;
   int status;
   waitpid(-lastJob->pgid, &status, WUNTRACED);
   tcsetpgrp(STDIN_FILENO, getpgrp());
@@ -37,7 +38,7 @@ void fg_job() {
     printf("\n");
   }
   if (WIFEXITED(status)) {
-    remove_job(jobs->numJobs - 1);
+    remove_job(jobs->lastJob);
   }
 }
 
@@ -47,8 +48,8 @@ void bg_job() {
   }
   struct Job* lastJob = jobs->jobs[jobs->lastJob];
   printf("%s &\n", lastJob->command);
-  kill(lastJob->pgid, SIGCONT);
-  set_job_status(jobs->numJobs - 1, JOB_RUNNING);
+  kill(-lastJob->pgid, SIGCONT);
+  set_job_status(jobs->lastJob, JOB_RUNNING);
 }
 
 void init_jobs(int maxJobs) {
@@ -88,6 +89,7 @@ void remove_job(int jobNumber) {
   for (int i = jobs->highestJob; i >= 0; i--) {
     if (jobs->jobs[i] != NULL) {
       jobs->lastJob = i;
+      jobs->highestJob = i;
       break;
     }
   }
@@ -101,9 +103,13 @@ void update_jobs() {
     if (jobs->jobs[i] != NULL) {
       int pgid = jobs->jobs[i]->pgid;
       int status;
-      if (waitpid(pgid, &status, WNOHANG | WUNTRACED) == pgid) {
+      if (waitpid(-pgid, &status, WNOHANG | WUNTRACED) == pgid) {
+        if (WIFSIGNALED(status)) {
+          if (WTERMSIG(status) == SIGINT) {
+            remove_job(jobs->lastJob);
+          }
+        }
         if (WIFEXITED(status)) {
-          printf("job: %d, pid: %d\n", i, pgid);
           jobs->jobs[i]->status = JOB_DONE;
           jobDone = true;
         }

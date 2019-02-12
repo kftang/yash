@@ -1,8 +1,8 @@
 CC=gcc
 CFLAGS=-std=gnu99 -g
 
-yash: shell.c signals.o parser.o runner.o jobs.o
-	$(CC) -o yash shell.c signals.o parser.o runner.o jobs.o $(CFLAGS)
+yash: shell.c signals.o parser.o runner.o jobs.o redir.o
+	$(CC) -o yash shell.c signals.o parser.o runner.o jobs.o redir.o $(CFLAGS)
 
 signals.o: signals.c
 	$(CC) -c -o signals.o signals.c $(CFLAGS)
@@ -15,4 +15,7 @@ runner.o: runner.c
 
 jobs.o: jobs.c
 	$(CC) -c -o jobs.o jobs.c $(CFLAGS)
+
+redir.o: redir.c
+	$(CC) -c -o redir.o redir.c $(CFLAGS)
 

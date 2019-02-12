@@ -1,8 +1,11 @@
+#include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "parser.h"
 
@@ -87,11 +90,12 @@ bool _next_token_valid(int curToken, int nextToken, int* usedTokens) {
 }
 
 // Parse the tokens in a command into the executable, args, any redirs, and bg
-void _parse_command(struct Command* command) {
+bool _parse_command(struct Command* command) {
   // Initialize values
-  command->in = NULL;
-  command->out = NULL;
-  command->err = NULL;
+  command->args = NULL;
+  command->infd = STDIN_FILENO;
+  command->outfd = STDOUT_FILENO;
+  command->errfd = STDERR_FILENO;
   command->backgrounded = false;
   // Num of args includes executable
   int numArgs = 1;
@@ -106,11 +110,40 @@ void _parse_command(struct Command* command) {
     if (currentTokenType == TOKEN_WORD && lastTokenType == TOKEN_WORD) {
       numArgs++;
     } else if (lastTokenType == TOKEN_REDIR_STDIN) {
-      command->in = command->tokens[i];
+      struct Token* inToken = command->tokens[i];
+      int flags = O_RDONLY;
+      int fd = open(inToken->tokenValue, flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+      if (fd == -1) {
+        printf("%s: No such file or directory\n", inToken->tokenValue);
+        return false;
+      }
+      command->infd = fd;
     } else if (lastTokenType == TOKEN_REDIR_STDOUT) {
-      command->out = command->tokens[i];
+      struct Token* outToken = command->tokens[i];
+      int flags = O_CREAT | O_WRONLY | O_TRUNC;
+      int fd = open(outToken->tokenValue, flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+      if (fd == -1) {
+        if (errno == EACCES) {
+          printf("%s: Access denied to file\n", outToken->tokenValue);
+        } else if (errno == EISDIR) {
+          printf("%s: Is a directory", outToken->tokenValue);
+        }
+        return false;
+      }
+      command->outfd = fd;
     } else if (lastTokenType == TOKEN_REDIR_STDERR) {
-      command->err = command->tokens[i];
+      struct Token* errToken = command->tokens[i];
+      int flags = O_CREAT | O_WRONLY | O_TRUNC;
+      int fd = open(errToken->tokenValue, flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
+      if (fd == -1) {
+        if (errno == EACCES) {
+          printf("%s: Access denied to file\n", errToken->tokenValue);
+        } else if (errno == EISDIR) {
+          printf("%s: Is a directory", errToken->tokenValue);
+        }
+        return false;
+      }
+      command->errfd = fd;
     } else if (currentTokenType == TOKEN_BACKGROUND) {
       command->backgrounded = true;
     }
@@ -137,12 +170,16 @@ void _parse_command(struct Command* command) {
     }
     lastTokenType = currentTokenType;
   }
+  return true;
 }
 
 // Parse tokens into commands
 struct Command** _parse_tokens(struct Token** tokens, int numTokens, int numCommands) {
   // Create commands array
   struct Command** commands = (struct Command**) malloc(sizeof(struct Command*) * numCommands);
+  for (int i = 0; i < numCommands; i++) {
+    commands[i] = NULL;
+  }
   
   // Store last pipe location to calculate length of command
   // This value is actually equal to the index right after the pipe
@@ -190,7 +227,9 @@ struct Command** _parse_tokens(struct Token** tokens, int numTokens, int numComm
     }
 
     // Parse command to get the arguments, redirectors and backgrounder
-    _parse_command(currentCommand);
+    if (!_parse_command(currentCommand)) {
+      return NULL;
+    }
 
     // Set the command in the commands array
     commands[i] = currentCommand;
@@ -206,16 +245,23 @@ void _free_tokens(struct Token** tokens, int numTokens) {
   free(tokens);
 }
 
-void free_tokens(struct ParsedInput* parsedInput) {
-  _free_tokens(parsedInput->tokens, parsedInput->numTokens);
-  for (int i = 0; i < parsedInput->numCommands; i++) {
-    free(parsedInput->commands[i]->tokens);
-    free(parsedInput->commands[i]->args);
-    free(parsedInput->commands[i]);
+void free_tokens(struct ParsedInput* input) {
+  _free_tokens(input->tokens, input->numTokens);
+  for (int i = 0; i < input->numCommands; i++) {
+    struct Command* command = input->commands[i];
+    if (command != NULL) {
+      if (command->tokens != NULL) {
+        free(command->tokens);
+      }
+      if (command->args != NULL) {
+        free(command->args);
+      }
+      free(command);
+    }
   }
-  free(parsedInput->originalInput);
-  free(parsedInput->commands);
-  free(parsedInput);
+  free(input->originalInput);
+  free(input->commands);
+  free(input);
 }
 
 struct ParsedInput* parse_input(char* input) {
@@ -288,7 +334,12 @@ struct ParsedInput* parse_input(char* input) {
   parsedInput->numCommands = numPipes + 1;
 
   // Parse tokens into commands
-  parsedInput->commands = _parse_tokens(tokens, numTokens, numPipes + 1);
+  struct Command** commands = _parse_tokens(tokens, numTokens, numPipes + 1);
+  if (commands == NULL) {
+    _free_tokens(tokens, numTokens);
+    return NULL;
+  }
+  parsedInput->commands = commands;
   return parsedInput;
 }
 

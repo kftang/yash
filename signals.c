@@ -5,7 +5,7 @@
 
 void handle_sigint() {
   if (gpidRunning != 0) {
-    kill(gpidRunning, SIGINT);
+    kill(-gpidRunning, SIGINT);
     gpidRunning = 0;
   }
   return;
@@ -13,7 +13,7 @@ void handle_sigint() {
 
 void handle_sigtstp() {
   if (gpidRunning != 0) {
-    kill(gpidRunning, SIGTSTP);
+    kill(-gpidRunning, SIGTSTP);
     gpidRunning = 0;
   }
   return;
@@ -55,7 +55,7 @@ void setup_handlers() {
   sigaddset(&(action.sa_mask), SIGINT);
   sigaddset(&(action.sa_mask), SIGCHLD);
   sigaddset(&(action.sa_mask), SIGTSTP);
-  // sigaddset(&(action.sa_mask), SIGTTOU);
+  sigaddset(&(action.sa_mask), SIGTTOU);
   // sigaddset(&(action.sa_mask), SIGTTIN);
 
   sigaction(SIGINT, &action, NULL);
