@@ -105,19 +105,25 @@ void run_single(struct ParsedInput* input) {
   char* originalInput = input->originalInput;
   char* inputCopy = (char*) malloc(sizeof(char) * (strlen(originalInput) + 1));
   strcpy(inputCopy, originalInput);
-  int job = add_job(cpid, inputCopy);
   gpidRunning = cpid;
   if (!command->backgrounded) {
     tcsetpgrp(STDIN_FILENO, cpid); 
     int status;
     waitpid(cpid, &status, WUNTRACED);
-    if (WIFSTOPPED(status)) {
-      set_job_status(job, JOB_STOPPED);
-      printf("\n");
-    } else {
-      update_jobs();
-    }
     tcsetpgrp(STDIN_FILENO, getpid());
+    if (WIFSTOPPED(status)) {
+      int jobId = add_job(cpid, inputCopy);
+      set_job_status(jobId, JOB_STOPPED);
+      printf("\n");
+    }
+    if (WIFEXITED(status)) {
+      printf("exit: %d", WEXITSTATUS(status));
+    }
+    if (WIFSIGNALED(status)) {
+      printf("signal: %d", WTERMSIG(status));
+    }
+  } else {
+    add_job(cpid, inputCopy);
   }
   free(commandAsString);
 }
