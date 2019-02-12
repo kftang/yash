@@ -16,6 +16,7 @@ struct JobsList {
   struct Job** jobs;
   int maxJobs;
   int numJobs;
+  int highestJob;
   int lastJob;
 };
 

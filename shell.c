@@ -19,6 +19,7 @@ int main() {
   do {
     if (jobDone) {
       print_jobs();
+      jobDone = false;
     }
     printf("# ");
     fgets(input, 2000, stdin);

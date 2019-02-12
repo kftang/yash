@@ -27,7 +27,7 @@ void fg_job() {
   if (jobs->numJobs < 1) {
     return;
   }
-  struct Job* lastJob = jobs->jobs[jobs->numJobs - 1];
+  struct Job* lastJob = jobs->jobs[jobs->lastJob];
   printf("%s\n", lastJob->command);
   kill(lastJob->pgid, SIGCONT);
   int status;
@@ -45,7 +45,7 @@ void bg_job() {
   if (jobs->numJobs < 1) {
     return;
   }
-  struct Job* lastJob = jobs->jobs[jobs->numJobs - 1];
+  struct Job* lastJob = jobs->jobs[jobs->lastJob];
   printf("%s &\n", lastJob->command);
   kill(lastJob->pgid, SIGCONT);
   set_job_status(jobs->numJobs - 1, JOB_RUNNING);
@@ -58,26 +58,38 @@ void init_jobs(int maxJobs) {
   }
   jobs->maxJobs = maxJobs;
   jobs->numJobs = 0;
+  jobs->highestJob = -1;
+  jobs->lastJob = -1;
 }
 
 // Returns job number
 int add_job(int pgid, char* input) {
-  jobs->jobs[jobs->numJobs] = (struct Job*) malloc(sizeof(struct Job));
-  struct Job* addedJob = jobs->jobs[jobs->numJobs];
+  int addIndex = jobs->highestJob + 1;
+  jobs->jobs[addIndex] = (struct Job*) malloc(sizeof(struct Job));
+  struct Job* addedJob = jobs->jobs[addIndex];
   addedJob->pgid = pgid;
   addedJob->status = JOB_RUNNING;
   addedJob->command = input;
   jobs->numJobs++;
-  return jobs->numJobs - 1;
+  jobs->highestJob++;
+  jobs->lastJob = addIndex;
+  return addIndex;
 }
 
 void remove_job(int jobNumber) {
   // Free the job being removed
   free(jobs->jobs[jobNumber]);
+  jobs->jobs[jobNumber] = NULL;
 
-  // Shift elements down one
-  for (int i = jobNumber; i < jobs->numJobs - 1; i++) {
-    jobs->jobs[i] = jobs->jobs[i + 1];
+  if (jobNumber == jobs->highestJob) {
+    jobs->highestJob--;
+  }
+
+  for (int i = jobs->highestJob; i >= 0; i--) {
+    if (jobs->jobs[i] != NULL) {
+      jobs->lastJob = i;
+      break;
+    }
   }
 
   // Decrement number of jobs
@@ -85,28 +97,34 @@ void remove_job(int jobNumber) {
 }
 
 void update_jobs() {
-  for (int i = 0; i < jobs->numJobs; i++) { 
-    int pgid = jobs->jobs[i]->pgid;
-    int status;
-    waitpid(pgid, &status, WNOHANG);
-    if (WIFEXITED(status)) {
-      jobs->jobs[i]->status = JOB_DONE;
-      jobDone = true;
+  for (int i = 0; i < jobs->maxJobs; i++) { 
+    if (jobs->jobs[i] != NULL) {
+      int pgid = jobs->jobs[i]->pgid;
+      int status;
+      if (waitpid(pgid, &status, WNOHANG | WUNTRACED) == pgid) {
+        if (WIFEXITED(status)) {
+          printf("job: %d, pid: %d\n", i, pgid);
+          jobs->jobs[i]->status = JOB_DONE;
+          jobDone = true;
+        }
+      }
     }
   }
 }
 
 void print_jobs() {
-  for (int i = 0; i < jobs->numJobs; i++) {
+  for (int i = 0; i < jobs->maxJobs; i++) {
     struct Job* job = jobs->jobs[i];
-    char* statusString = _status(job);
-    printf("[%d]%c\t%s\t\t%s\n", i + 1, i == jobs->numJobs - 1 ? '+' : '-', statusString, job->command);
-    if (job->status == JOB_DONE) {
-      remove_job(i);
-      i--;
+    if (job != NULL) {
+      char* statusString = _status(job);
+      printf("[%d]%c\t%s\t\t%s\n", i + 1, i == jobs->lastJob ? '+' : '-', statusString, job->command);
+      if (job->status == JOB_DONE) {
+        remove_job(i);
+      }
+      free(statusString);
     }
-    free(statusString);
   }
+  jobDone = false;
 }
 
 void set_job_status(int jobNumber, int status) {
@@ -115,7 +133,7 @@ void set_job_status(int jobNumber, int status) {
 }
 
 void free_jobs() {
-  for (int i = 0; i < jobs->numJobs; i++) {
+  for (int i = 0; i < jobs->maxJobs; i++) {
     if (jobs->jobs[i] != NULL) {
       free(jobs->jobs[i]->command);
       free(jobs->jobs[i]);
