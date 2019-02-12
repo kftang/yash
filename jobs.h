@@ -16,12 +16,15 @@ struct JobsList {
   struct Job** jobs;
   int maxJobs;
   int numJobs;
+  int lastJob;
 };
 
 struct JobsList* jobs;
 int gpidRunning;
+bool jobDone;
 
 void fg_job();
+void bg_job();
 void init_jobs(int maxJobs);
 int add_job(int pgid, char* jobString);
 void remove_job(int pid);

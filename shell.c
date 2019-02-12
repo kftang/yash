@@ -14,8 +14,12 @@ int main() {
   init_jobs(20);
   gpidRunning = 0;
   setup_handlers();
+  jobDone = false;
   //setsid();
   do {
+    if (jobDone) {
+      print_jobs();
+    }
     printf("# ");
     fgets(input, 2000, stdin);
 
@@ -39,7 +43,7 @@ int main() {
     } else if (strcmp(input, "fg") == 0) {
       fg_job();
     } else if (strcmp(input, "bg") == 0) {
-
+      bg_job();
     } else {
 
       // Parse input

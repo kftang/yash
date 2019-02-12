@@ -46,8 +46,9 @@ void bg_job() {
     return;
   }
   struct Job* lastJob = jobs->jobs[jobs->numJobs - 1];
-  printf("%s\n", lastJob->command);
+  printf("%s &\n", lastJob->command);
   kill(lastJob->pgid, SIGCONT);
+  set_job_status(jobs->numJobs - 1, JOB_RUNNING);
 }
 
 void init_jobs(int maxJobs) {
@@ -90,6 +91,7 @@ void update_jobs() {
     waitpid(pgid, &status, WNOHANG);
     if (WIFEXITED(status)) {
       jobs->jobs[i]->status = JOB_DONE;
+      jobDone = true;
     }
   }
 }
