@@ -15,7 +15,6 @@ int main() {
   gpidRunning = 0;
   setup_handlers();
   jobDone = false;
-  //setsid();
   do {
     if (jobDone) {
       print_jobs();

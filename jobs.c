@@ -79,6 +79,7 @@ int add_job(int pgid, char* input) {
 
 void remove_job(int jobNumber) {
   // Free the job being removed
+  free(jobs->jobs[jobNumber]->command);
   free(jobs->jobs[jobNumber]);
   jobs->jobs[jobNumber] = NULL;
 
@@ -123,7 +124,11 @@ void print_jobs() {
     struct Job* job = jobs->jobs[i];
     if (job != NULL) {
       char* statusString = _status(job);
-      printf("[%d]%c\t%s\t\t%s\n", i + 1, i == jobs->lastJob ? '+' : '-', statusString, job->command);
+      char bg[3] = " &";
+      if (strcmp(statusString, "Stopped") == 0 || strchr(job->command, '&') != NULL) {
+        bg[0] = 0;
+      }
+      printf("[%d]%c\t%s\t\t%s%s\n", i + 1, i == jobs->lastJob ? '+' : '-', statusString, job->command, bg);
       if (job->status == JOB_DONE) {
         remove_job(i);
       }
