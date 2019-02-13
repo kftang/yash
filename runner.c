@@ -251,4 +251,3 @@ void run_single(struct ParsedInput* input) {
   free(commandAsString);
 }
 
-

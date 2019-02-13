@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=gnu99 -g
+CFLAGS=-std=gnu99
 
 yash: shell.c signals.o parser.o runner.o jobs.o redir.o
 	$(CC) -o yash shell.c signals.o parser.o runner.o jobs.o redir.o $(CFLAGS)
