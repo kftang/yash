@@ -37,9 +37,6 @@ void fg_job() {
   if (WIFSTOPPED(status)) {
     printf("\n");
   }
-  if (WIFEXITED(status)) {
-    remove_job(jobs->lastJob);
-  }
 }
 
 void bg_job() {
@@ -82,10 +79,6 @@ void remove_job(int jobNumber) {
   free(jobs->jobs[jobNumber]->command);
   free(jobs->jobs[jobNumber]);
   jobs->jobs[jobNumber] = NULL;
-
-  if (jobNumber == jobs->highestJob) {
-    jobs->highestJob--;
-  }
 
   for (int i = jobs->highestJob; i >= 0; i--) {
     if (jobs->jobs[i] != NULL) {
